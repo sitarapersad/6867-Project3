@@ -19,7 +19,7 @@ import matplotlib
 import pylab as pl
 
 
-def forward_prop(Xtrain, weights, offsets, activation_fn, output_fn):
+def forward_prop(xtrain, weights, offsets, activation_fn, output_fn):
     '''
     Performs forward propagation on the training data with
     a matrix a weights, where weights[l] and offsets[l] 
@@ -30,7 +30,7 @@ def forward_prop(Xtrain, weights, offsets, activation_fn, output_fn):
     '''
     debug = 0   # set to true for more verbose output
     if debug:
-        print 'Xtrain', Xtrain.shape
+        print 'xtrain', xtrain.shape
         print 'weights', len(weights), weights[0].shape
         print 'offsets', len(offsets), offsets[0].shape
     
@@ -40,7 +40,7 @@ def forward_prop(Xtrain, weights, offsets, activation_fn, output_fn):
     assert len(weights) == len(offsets)
     
     #compute neurons for the hidden layers
-    prev_layer = Xtrain
+    prev_layer = xtrain
     for l in range(L-2):
         
         #aggregate the inputs from the previous layer
@@ -49,18 +49,20 @@ def forward_prop(Xtrain, weights, offsets, activation_fn, output_fn):
         if debug:
             print 'l: ', l ,'\t', 'wts', W.shape, '\t', 'b', offsets[l].shape
             print 'aggregated', layer_l, layer_l.shape
+            
         #activate the neurons in the current layer
         layer_l = activation_fn(layer_l)
         if debug:
             print 'activated', layer_l
         prev_layer = layer_l
         
-    #compute the final output which has a different activation fn
+    #aggregate the final output which has a different activation fn
     W = weights[L-2] 
     output_layer = np.dot(W.T, prev_layer) + offsets[L-2]
     if debug:
         print 'l: ', L-2, '\t','wts', W.shape, '\t','b', offsets[L-2].shape
         print 'aggregated', output_layer
+        
     #activate the neurons in the final layer
     output_layer = output_fn(output_layer)
     if debug:
@@ -110,7 +112,7 @@ def cross_entropy(expected, actual):
     #Compute log of expected values   
     log_expected = np.log(expected)
     if debug:
-        print 'Expected', log_expected.shape, '\t', 'Actual', actual.shape
+        print 'Expected', log_expected.shape, '\t', 'Actual', actual.shape 
         
     return -np.dot(actual.T,log_expected)
     
@@ -121,7 +123,7 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
     using the following parameters:
     L - number of layers (including input (l=1) and output (l=L) layers)
     M - array of number of neurons at each level. If unspecified, assume
-        we will use the number of training points.
+        we will use the number of dimensions of the data.
     k - the number of output classes
     activation_fn - the activation function used. We will use the same 
                     activation function, ReLU for each neuron in the 
@@ -133,7 +135,7 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
     #Initialise the weights and offsets for each layer depending on the number 
     #of neurons per layer specified by M
     if M is None:
-        M = [n]*(L-2)+[k]
+        M = [d]*(L-2)+[k]
         
     # Ensure we are specifying the correct number of weights
     assert len(M) == L-1
@@ -146,7 +148,7 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
     # Create an offset matrix of dimensions m1 * 1, where m1 is the number of 
     # neurons in layer l
     
-    m1 = n
+    m1 = d
     for i in range(L-1):
         m2 = M[i]
         # Weight values are randomly initialized with mean 0 and std. dev 1/sqrt(m1)
@@ -164,3 +166,15 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
     # 
     
     return None 
+    
+def predictNN(x, weights, offsets):
+    '''
+    '''
+    
+    return None
+
+def classify_error(X, Y, weights, offsets):
+    '''
+    '''
+    
+    return None
