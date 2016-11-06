@@ -213,10 +213,16 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
     # Train the neural network until its performance on a validation set plateaus
     converged = False    
     while not converged:
-    # Propagate weights forward through neural network
-    
-    
-    # 
+        # Choose random index for stochastic gradient update
+        index = np.random.randint(0,n+1)
+        xtrain = Xtrain[index]
+        ytrain = Ytrain[index]
+        # Propagate weights forward through neural network
+        aggregated, activated = forward_prop(xtrain, weights, offsets)
+        # Compute error vectors through back propagation
+        delta = back_prop(ytrain, weights, offsets, aggregated, activated, 
+        # Perform gradient update for each set of parameters
+        
     
     return None 
     
