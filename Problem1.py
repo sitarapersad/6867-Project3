@@ -19,7 +19,7 @@ import matplotlib
 import pylab as pl
 
 
-def forward_prop(xtrain, weights, offsets, activation_fn, output_fn):
+def forward_prop(xtrain, weights, offsets, activation_fn = ReLU, output_fn = softmax):
     '''
     Performs forward propagation on the training data with
     a matrix a weights, where weights[l] and offsets[l] 
@@ -70,15 +70,45 @@ def forward_prop(xtrain, weights, offsets, activation_fn, output_fn):
                 
 
     
-def back_prop(weights, offsets, aggregated, activated):
+def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softmax, activation_fn = ReLU, loss_fn = cross_entropy):
     '''
     Computes the derivate of less with respect to aggregated value for each 
     layer of the neural nets using the recursive update rule 
     d[l] = Diag(f'(z[l]))W[l+1]
-    with a base case given by 
+    with a base case given by d[L] = Diag(f'(z[L])) * dLoss/da[L]
     
+    Returns a list of error vectors , d   
     '''
-    return None 
+    #count the number of layers in the network:
+    L = len(weights) + 1
+    
+    #initialise list of error vectors
+    d = [0]*(L-1)
+    
+    base_case = True
+    for l in range(L-1,0,-1):
+        #base case is the final layer of the network
+        if base_case:
+            #compute derivative of output function wrt aggregated layer
+            z_l = aggregated[l]
+            f_prime = output_fn(z_l, derivative = True)
+            diag_f = np.diag(f_prime)
+            #compute derivative of loss wrt activated layer
+            a_l = activated[l]
+            l_prime = loss_fn(ytrain, a_l, derivative = True)
+            base_case = False
+        # all other errors can be computed in terms of subsequent errors
+        else:
+            W = weights[l+1]
+            err = d[l+1]
+            z_l = aggregated[l]
+            # compute derivative wrt aggregated layer
+            f_prime = activation_fn(z_l, derivative = True)
+            diag_f = np.diag(f_prime)
+            d_l = np.dot(np.dot(diag_f,W),err)
+            d[l] = d_l            
+    
+    return d
     
 def ReLU(layer ,derivative = False):
     '''
@@ -152,7 +182,7 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
                     hidden layers
     '''
     n,d = Xtrain.shape # n is the number of data points, d is the dimension
-        
+
     
     #Initialise the weights and offsets for each layer depending on the number 
     #of neurons per layer specified by M
