@@ -39,9 +39,13 @@ def forward_prop(xtrain, weights, offsets, activation_fn, output_fn):
     #ensure that the number of offsets equals the number of weights
     assert len(weights) == len(offsets)
     
+    # keep track of aggregated and activated vectors at each layer
+    aggregated = []
+    activated = []
+    
     #compute neurons for the hidden layers
     prev_layer = xtrain
-    for l in range(L-2):
+    for l in range(L-1):
         
         #aggregate the inputs from the previous layer
         W = weights[l]
@@ -49,31 +53,29 @@ def forward_prop(xtrain, weights, offsets, activation_fn, output_fn):
         if debug:
             print 'l: ', l ,'\t', 'wts', W.shape, '\t', 'b', offsets[l].shape
             print 'aggregated', layer_l, layer_l.shape
+        aggregated.append(layer_l)
             
         #activate the neurons in the current layer
-        layer_l = activation_fn(layer_l)
+        if l == L-2:
+            activate = output_fn
+        else:
+            activate = activation_fn
+        layer_l = activate(layer_l)
+        activated.append(layer_l)
         if debug:
             print 'activated', layer_l
         prev_layer = layer_l
-        
-    #aggregate the final output which has a different activation fn
-    W = weights[L-2] 
-    output_layer = np.dot(W.T, prev_layer) + offsets[L-2]
-    if debug:
-        print 'l: ', L-2, '\t','wts', W.shape, '\t','b', offsets[L-2].shape
-        print 'aggregated', output_layer
-        
-    #activate the neurons in the final layer
-    output_layer = output_fn(output_layer)
-    if debug:
-        print 'activated',  output_layer
-    
-    return output_layer
+
+    return aggregated, activated
                 
 
     
-def back_prop():
+def back_prop(weights, offsets, aggregated, activated):
     '''
+    Computes the derivate of less with respect to aggregated value for each 
+    layer of the neural nets using the recursive update rule 
+    d[l] = Diag(f'(z[l]))W[l+1]
+    with a base case given by 
     
     '''
     return None 
@@ -84,23 +86,36 @@ def ReLU(layer ,derivative = False):
     ReLU activation function to return a vector of the same dimension
     where ReLU(z)=max(0,z)
     '''
-    return 0.5*(layer + np.absolute(layer))
+    relu = 0.5*(layer + np.absolute(layer))
+    if not derivative:
+        return relu
+    else:
+        # replace all non-zero values with 1 
+        relu[relu>0] = 1
+        return relu
     
-def softmax(layer):
+def softmax(layer, derivative = False):
     '''
     Given a k x 1 vector, computes the softmax probability
     output as a k x 1 vector
     '''
     e_x = np.exp(layer - np.max(layer))
     softmax_layer = e_x / e_x.sum(axis=0)
+    # replace zeros with small values to avoid underflow
+    softmax_layer[softmax_layer == 0] = 1e-10
     
-    return softmax_layer
+    if not derivative:
+        return softmax_layer
+    else:
+        return softmax_layer * (1 - softmax_layer)
     
-def cross_entropy(expected, actual):
+def cross_entropy(expected, actual, derivative = False):
     '''
     Given an expected softmax'd output layer, computes the cross-entropy loss
     with the actual one-hot output layer, 
     where Loss = - sum(actual[i]*log[expected[i]])
+     
+    If specified, returns the derivative in column vector format
     '''
     debug = False
     
@@ -109,12 +124,19 @@ def cross_entropy(expected, actual):
     expected = expected.reshape(-1,1)    
     assert actual.shape[0] == expected.shape[0]
     
-    #Compute log of expected values   
+    # Replace zeros in the expected vector to avoid underflow
+    expected[expected == 0] = 1e-10
+    
+    # Compute log of expected values   
     log_expected = np.log(expected)
     if debug:
         print 'Expected', log_expected.shape, '\t', 'Actual', actual.shape 
-        
-    return -np.dot(actual.T,log_expected)
+    
+    if not derivative:
+        return -np.dot(actual.T,log_expected)
+    else:
+        inverse_expected = 1./expected
+        return -np.multiply(inverse_expected.T, actual.T).T
     
     
 def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=softmax):
@@ -159,7 +181,8 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
         m1 = m2
     
     # Train the neural network until its performance on a validation set plateaus
-    
+    converged = False    
+    while not converged:
     # Propagate weights forward through neural network
     
     
