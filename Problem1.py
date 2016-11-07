@@ -85,7 +85,7 @@ def forward_prop(xtrain, weights, offsets, activation_fn = ReLU, output_fn = sof
     activation_fn is used on the hidden layers, and output_fn
     is used to compute the final output
     '''
-    debug = 1   # set to true for more verbose output
+    debug = 0 # set to true for more verbose output
     if debug:
         print 'xtrain', xtrain.shape
         print 'weights', len(weights), weights[0].shape
@@ -96,12 +96,13 @@ def forward_prop(xtrain, weights, offsets, activation_fn = ReLU, output_fn = sof
     #ensure that the number of offsets equals the number of weights
     assert len(weights) == len(offsets)
     
+    #compute neurons for the hidden layers
+    prev_layer = xtrain.reshape(-1,1)
+        
     # keep track of aggregated and activated vectors at each layer
     aggregated = []
     activated = []
     
-    #compute neurons for the hidden layers
-    prev_layer = xtrain.reshape(-1,1)
     for l in range(L-1):
         #aggregate the inputs from the previous layer
         W = weights[l]
@@ -136,6 +137,7 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
     
     Returns a list of error vectors , d   
     '''
+    debug = 0
     #count the number of layers in the network:
     L = len(weights) + 1
     
@@ -148,8 +150,10 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
         if base_case:
             #compute derivative of output function wrt aggregated layer
             z_l = aggregated[l]
-            f_prime = output_fn(z_l, derivative = True)
-            diag_f = np.diag(f_prime)
+            f_prime = output_fn(z_l, derivative = True).reshape(1,-1)
+            diag_f = np.diagflat(f_prime)
+            if debug:
+                print 'basecase', f_prime, diag_f
             #compute derivative of loss wrt activated layer
             a_l = activated[l]
             l_prime = loss_fn(ytrain, a_l, derivative = True)
@@ -162,14 +166,14 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
             z_l = aggregated[l]
             # compute derivative wrt aggregated layer
             f_prime = activation_fn(z_l, derivative = True)
-            diag_f = np.diag(f_prime)
+            diag_f = np.diagflat(f_prime)
             d_l = np.dot(np.dot(diag_f,W),err)
             d[l] = d_l            
-    
+
     return d
    
     
-def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-3, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
+def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e10, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
     '''
     Trains a neural network given training data Xtrain and Y train
     using the following parameters:
@@ -188,6 +192,9 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
     #of neurons per layer specified by M
     if M is None:
         M = [d]*(L-2)+[k]
+    
+    #Ensure output layer has k neurons
+    M[-1] = k
         
     # Ensure we are specifying the correct number of weights
     assert len(M) == L-1
@@ -206,10 +213,10 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
         # Weight values are randomly initialized with mean 0 and std. dev 1/sqrt(m1)
         W = np.random.normal(0, 1./np.sqrt(m1), (m1,m2))
         weights.append(W)
-        b = np.random.normal(0,1./np.sqrt(m1), (m2,1))
+        b = np.random.normal(0, 1./np.sqrt(m1), (m2,1))
         offsets.append(b)
         m1 = m2
-    
+    print 'Initial Accuracy', classify_accuracy(Xval, Yval, weights, offsets), classify_accuracy(Xtrain, Ytrain, weights, offsets)
     # Train the neural network until its performance on a validation set plateaus
     converged = False 
     prev_acc = 0
@@ -217,24 +224,27 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
     while not converged:
         num_iters += 1
         # Choose random index for stochastic gradient update
-        index = np.random.randint(0,n+1)
-        xtrain = Xtrain[index]
+        index = np.random.randint(0,n)
+        xtrain = Xtrain[index].reshape(-1,1)
         ytrain = Ytrain[index]
         # Propagate weights forward through neural network
         aggregated, activated = forward_prop(xtrain, weights, offsets)
         # Compute error vectors through back propagation
         delta = back_prop(ytrain, weights, offsets, aggregated, activated)
+        activated.append(xtrain)        
         # Perform gradient update for each set of parameters
         for l in range(L-1):
             weights[l] = weights[l] - learning_rate*np.dot(activated[l-1],delta[l].T)
             offsets[l] = offsets[l] - learning_rate*delta[l]
         # Test for convergence
         acc = classify_accuracy(Xval, Yval, weights, offsets)
-        if acc<prev_acc:
+        if acc<prev_acc-1e-2:
             converged = True
         prev_acc = acc
-        if num_iters%1000==0:
-            print num_iters
+        test_acc = classify_accuracy(Xtrain, Ytrain, weights, offsets)
+        if num_iters%100==0:
+            print 'Iters, acc', num_iters, acc, test_acc
+
     return weights, offsets , acc, num_iters
     
 def NN_predict(x, weights, offsets):
@@ -242,12 +252,14 @@ def NN_predict(x, weights, offsets):
     Given the weights and offsets calculated from training the neural net,
     predict the class of x
     '''
-    y = forward_prop(x, weights, offsets)
+    aggregated, activated = forward_prop(x, weights, offsets)
+    y = activated[-1]
     # convert predicted vector to one-hot classification
-    y[y == y.max()] = 1
+    y[y.argmax()] = 1
     y[y < 1] = 0
     # what if there are more than one max values?
-    assert sum(y)<= 1
+    if sum(y) > 1:
+        y[y.argmax()[0]] = 1
     return y
 
 def classify_accuracy(X, Y, weights, offsets):
@@ -263,16 +275,18 @@ def classify_accuracy(X, Y, weights, offsets):
     for i in range(len(X)):
         predict_y = NN_predict(X[i], weights, offsets).reshape(1,-1)
         y = Y[i].reshape(1,-1)
-        correct += np.dot(y, predict_y)  
+        correct += np.dot(y, predict_y.T)[0][0]
     return correct/n1
 
-def one_hot(Y):
+def one_hot(Y,k):
     '''
     Given an array of target values, Y, and number of labels, k
     convert the array to an array of one-hot vectors
     '''
-    
-    return None 
+    n = Y.shape[0] #number of data points
+    one_hot = np.zeros((n, k))
+    one_hot[np.arange(n), Y] = 1
+    return one_hot
     
 #### TEST ON TOY DATASET ####
 test_toy = True
@@ -280,15 +294,12 @@ if test_toy:
     toy_data = './hw3_resources/data/data_3class.csv'
     train = np.loadtxt(toy_data)
     X = train[:,0:2]
-    Y = train[:,2:3]
-    print X.shape
-    print Y.shape
+    Y = train[:,2:3].astype(int)
     Xtrain = X[:400,:]
-    Ytrain = Y[:400,:]
-    
+    Ytrain = one_hot(Y[:400,:].reshape(1,-1)[0],3)
+
     Xval = X[400:600,:]
-    Yval = Y[400:600,:]
-    print Xtrain.shape
+    Yval = one_hot(Y[400:600,:].reshape(1,-1)[0],3)
     print 'Training...'
-    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval)
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=4,M=[10,10,3])
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
