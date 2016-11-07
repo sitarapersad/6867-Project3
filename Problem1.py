@@ -18,6 +18,64 @@ import numpy as np
 import matplotlib
 import pylab as pl
 
+    
+def ReLU(layer ,derivative = False):
+    '''
+    Given a vector of aggregated neuron values, applies the 
+    ReLU activation function to return a vector of the same dimension
+    where ReLU(z)=max(0,z)
+    '''
+    relu = 0.5*(layer + np.absolute(layer))
+    if not derivative:
+        return relu
+    else:
+        # replace all non-zero values with 1 
+        relu[relu>0] = 1
+        return relu
+    
+def softmax(layer, derivative = False):
+    '''
+    Given a k x 1 vector, computes the softmax probability
+    output as a k x 1 vector
+    '''
+    e_x = np.exp(layer - np.max(layer))
+    softmax_layer = e_x / e_x.sum(axis=0)
+    # replace zeros with small values to avoid underflow
+    softmax_layer[softmax_layer == 0] = 1e-10
+    
+    if not derivative:
+        return softmax_layer
+    else:
+        return softmax_layer * (1 - softmax_layer)
+    
+def cross_entropy(expected, actual, derivative = False):
+    '''
+    Given an expected softmax'd output layer, computes the cross-entropy loss
+    with the actual one-hot output layer, 
+    where Loss = - sum(actual[i]*log[expected[i]])
+     
+    If specified, returns the derivative in column vector format
+    '''
+    debug = False
+    
+    # Ensure dimensions are correct    
+    actual = actual.reshape(-1,1)
+    expected = expected.reshape(-1,1)    
+    assert actual.shape[0] == expected.shape[0]
+    
+    # Replace zeros in the expected vector to avoid underflow
+    expected[expected == 0] = 1e-10
+    
+    # Compute log of expected values   
+    log_expected = np.log(expected)
+    if debug:
+        print 'Expected', log_expected.shape, '\t', 'Actual', actual.shape 
+    
+    if not derivative:
+        return -np.dot(actual.T,log_expected)
+    else:
+        inverse_expected = 1./expected
+        return -np.multiply(inverse_expected.T, actual.T).T
 
 def forward_prop(xtrain, weights, offsets, activation_fn = ReLU, output_fn = softmax):
     '''
@@ -86,7 +144,7 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
     d = [0]*(L-1)
     
     base_case = True
-    for l in range(L-1,0,-1):
+    for l in range(L-2,-1,-1):
         #base case is the final layer of the network
         if base_case:
             #compute derivative of output function wrt aggregated layer
@@ -109,67 +167,9 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
             d[l] = d_l            
     
     return d
+   
     
-def ReLU(layer ,derivative = False):
-    '''
-    Given a vector of aggregated neuron values, applies the 
-    ReLU activation function to return a vector of the same dimension
-    where ReLU(z)=max(0,z)
-    '''
-    relu = 0.5*(layer + np.absolute(layer))
-    if not derivative:
-        return relu
-    else:
-        # replace all non-zero values with 1 
-        relu[relu>0] = 1
-        return relu
-    
-def softmax(layer, derivative = False):
-    '''
-    Given a k x 1 vector, computes the softmax probability
-    output as a k x 1 vector
-    '''
-    e_x = np.exp(layer - np.max(layer))
-    softmax_layer = e_x / e_x.sum(axis=0)
-    # replace zeros with small values to avoid underflow
-    softmax_layer[softmax_layer == 0] = 1e-10
-    
-    if not derivative:
-        return softmax_layer
-    else:
-        return softmax_layer * (1 - softmax_layer)
-    
-def cross_entropy(expected, actual, derivative = False):
-    '''
-    Given an expected softmax'd output layer, computes the cross-entropy loss
-    with the actual one-hot output layer, 
-    where Loss = - sum(actual[i]*log[expected[i]])
-     
-    If specified, returns the derivative in column vector format
-    '''
-    debug = False
-    
-    # Ensure dimensions are correct    
-    actual = actual.reshape(-1,1)
-    expected = expected.reshape(-1,1)    
-    assert actual.shape[0] == expected.shape[0]
-    
-    # Replace zeros in the expected vector to avoid underflow
-    expected[expected == 0] = 1e-10
-    
-    # Compute log of expected values   
-    log_expected = np.log(expected)
-    if debug:
-        print 'Expected', log_expected.shape, '\t', 'Actual', actual.shape 
-    
-    if not derivative:
-        return -np.dot(actual.T,log_expected)
-    else:
-        inverse_expected = 1./expected
-        return -np.multiply(inverse_expected.T, actual.T).T
-    
-    
-def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=softmax):
+def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, learning_rate = 1e-3, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
     '''
     Trains a neural network given training data Xtrain and Y train
     using the following parameters:
@@ -220,20 +220,40 @@ def NN_train(Xtrain, Ytrain, L=3, M = None, k=3, activation_fn=ReLU, output_fn=s
         # Propagate weights forward through neural network
         aggregated, activated = forward_prop(xtrain, weights, offsets)
         # Compute error vectors through back propagation
-        delta = back_prop(ytrain, weights, offsets, aggregated, activated, 
+        delta = back_prop(ytrain, weights, offsets, aggregated, activated)
         # Perform gradient update for each set of parameters
+        for l in range(L-1):
+            weights[l] = weights[l] - learning_rate*np.dot(activated[l-1],delta[l].T)
+            offsets[l] = offsets[l] - learnign_rate*delta[l]
         
+    return weights, offsets 
     
-    return None 
-    
-def predictNN(x, weights, offsets):
+def NN_predict(x, weights, offsets):
     '''
+    Given the weights and offsets calculated from training the neural net,
+    predict the class of x
     '''
-    
-    return None
+    y = forward_prop(x, weights, offsets)
+    # convert predicted vector to one-hot classification
+    y[y == .max()] = 1
+    y[y < 1] = 0
+    # what if there are more than one max values?
+    assert sum(y)<= 1
+    return y
 
 def classify_error(X, Y, weights, offsets):
     '''
+    Given a set of X and Y values, as well as weights and offsets calculated by
+    training the neural net, compute the error rate
     '''
-    
-    return None
+    #Check dimensions for sanity
+    n1, d = X.shape
+    n2, k = Y.shape
+    assert n1==n2
+    correct = 0.0
+    for i in range(len(X)):
+        predict_y = NN_predict(X[i], weights, offsets).reshape(1,-1)
+        y = Y[i].reshape(1,-1)
+        correct += np.dot(y, predict_y)
+        
+    return correct/n1
