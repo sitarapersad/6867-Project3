@@ -123,9 +123,9 @@ def forward_prop(xtrain, weights, offsets, activation_fn = ReLU, output_fn = sof
         if debug:
             print 'activated', layer_l
         if np.isnan(layer_l).any():
-            print W.T
-            print prev_layer
-            print offsets[l]
+            print W.T,'weights'
+            print prev_layer, 'prev'
+            print offsets[l], 'off'
         prev_layer = layer_l
 
     return aggregated, activated
@@ -227,7 +227,9 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
     max_acc = 0
     num_iters = 0
     while not converged:
+        
         num_iters += 1
+        learning_rate = 0.1/np.sqrt(num_iters)
         # Choose random index for stochastic gradient update
         index = np.random.randint(0,n)
         xtrain = Xtrain[index].reshape(-1,1)
@@ -250,16 +252,20 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
             print weights
             assert False
         acc = classify_accuracy(Xval, Yval, weights, offsets)
-        if acc<prev_acc and acc > 0.95:
-            converged = True
-        prev_acc = acc
         if acc>max_acc:
             max_acc = acc
+            best_weights = weights
+            best_offsets = offsets
+            print max_acc
+        if acc<prev_acc and acc > 0.85:
+            return best_weights, best_offsets , acc, num_iters
+            
+        prev_acc = acc
         test_acc = classify_accuracy(Xtrain, Ytrain, weights, offsets)
         if num_iters%1000==0:
             print 'Iters, acc', num_iters, acc, test_acc
 
-    return weights, offsets , acc, num_iters
+    
     
 def NN_predict(x, weights, offsets):
     '''
@@ -315,13 +321,16 @@ if test_toy:
     train = np.loadtxt(toy_data)
     X = train[:,0:2]
     Y = train[:,2:3].astype(int)
-    Xtrain = X[:400,:]
-    Ytrain = one_hot(Y[:400,:].reshape(1,-1)[0],3)
+    Xtrain = X[:600,:]
+    Ytrain = one_hot(Y[:600,:].reshape(1,-1)[0],3)
 
-    Xval = X[400:600,:]
-    Yval = one_hot(Y[400:600,:].reshape(1,-1)[0],3)
+    Xval = X[600:,:]
+    Yval = one_hot(Y[600:,:].reshape(1,-1)[0],3)
     
+    Xtest = X[600:,:]
+    Ytest = one_hot(Y[600:,:].reshape(1,-1)[0],3)
     print Y[400:410,:], one_hot(Y[400:410,:].reshape(1,-1)[0],3)
     print 'Training...'
     weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=4,M=[5,10,3])
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
+    print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
