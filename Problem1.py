@@ -16,8 +16,10 @@ Pseudocode given in Lecture Notes:
 
 import numpy as np
 import pylab as pl
+import plotBoundary as plot
 
-    
+test = False
+
 def ReLU(layer ,derivative = False):
     '''
     Given a vector of aggregated neuron values, applies the 
@@ -31,6 +33,11 @@ def ReLU(layer ,derivative = False):
         # replace all non-zero values with 1 
         relu[relu>0] = 1
         return relu
+if test:
+    layer = np.array([1,2,-1,0,4,5,1])
+    print layer
+    print ReLU(layer)
+    print ReLU(layer, derivative = True)
     
 def softmax(layer, derivative = False):
     '''
@@ -46,6 +53,14 @@ def softmax(layer, derivative = False):
         return softmax_layer
     else:
         return softmax_layer * (1 - softmax_layer)
+        
+if test:
+    layer = np.array([1,2,-1,0,4,5,1])
+    layer2 = layer + 100000
+    print layer
+    print softmax(layer)
+    print softmax(layer2)
+    print softmax(layer, derivative = True)
     
 def cross_entropy(predicted, actual, derivative = False):
     '''
@@ -152,16 +167,19 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
     for l in range(L-2,-1,-1):
         #base case is the final layer of the network
         if base_case:
-            #compute derivative of output function wrt aggregated layer
-            z_l = aggregated[l]
-            f_prime = output_fn(z_l, derivative = True).reshape(1,-1)
-            diag_f = np.diagflat(f_prime)
-            if debug:
-                print 'basecase', f_prime, diag_f
-            #compute derivative of loss wrt activated layer
+#            #compute derivative of output function wrt aggregated layer
+#            z_l = aggregated[l]
+#            f_prime = output_fn(z_l, derivative = True).reshape(1,-1)
+#            diag_f = np.diagflat(f_prime)
+#            if debug:
+#                print 'basecase', f_prime, diag_f
+#            #compute derivative of loss wrt activated layer
             a_l = activated[l]
-            l_prime = loss_fn(a_l, ytrain, derivative = True)
-            d[l] = np.dot(diag_f, l_prime)
+#            l_prime = loss_fn(a_l, ytrain, derivative = True)
+#            d[l] = np.dot(diag_f, l_prime)
+            
+            #short cut to compute delta at output layer
+            d[l] = a_l - ytrain.reshape(-1,1)
             base_case = False
         # all other errors can be computed in terms of subsequent errors
         else:
@@ -177,7 +195,7 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
     return d
    
     
-def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-2, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
+def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 0.005, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
     '''
     Trains a neural network given training data Xtrain and Y train
     using the following parameters:
@@ -220,16 +238,18 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
         b = np.random.normal(0, 1./np.sqrt(m1), (m2,1))
         offsets.append(b)
         m1 = m2
-    print 'Initial Accuracy', classify_accuracy(Xval, Yval, weights, offsets), classify_accuracy(Xtrain, Ytrain, weights, offsets)
+    print 'Initial Accuracy', classify_accuracy(Xtrain, Ytrain, weights, offsets)
+    best_weights = np.copy(weights)
+    best_offsets = np.copy(offsets)
     # Train the neural network until its performance on a validation set plateaus
-    converged = False 
-    prev_acc = 0
+
+    history =500 # number of previous accuracies to consider
+    accuracies = [0]*history
     max_acc = 0
     num_iters = 0
-    while not converged:
-        
+    while True:
         num_iters += 1
-        learning_rate = 0.1/np.sqrt(num_iters)
+        learning_rate = 0.2/np.power(num_iters, 1./3)
         # Choose random index for stochastic gradient update
         index = np.random.randint(0,n)
         xtrain = Xtrain[index].reshape(-1,1)
@@ -252,18 +272,19 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 1e-
             print weights
             assert False
         acc = classify_accuracy(Xval, Yval, weights, offsets)
-        if acc>max_acc:
+        if acc > max_acc:
+            print acc
             max_acc = acc
-            best_weights = weights
-            best_offsets = offsets
-            print max_acc
-        if acc<prev_acc and acc > 0.85:
-            return best_weights, best_offsets , acc, num_iters
+            best_weights = np.copy(weights)
+            best_offsets = np.copy(offsets)
+
             
-        prev_acc = acc
-        test_acc = classify_accuracy(Xtrain, Ytrain, weights, offsets)
+        if acc <= sum(accuracies[-1*history:])/len(accuracies[-1*history:]):
+            return best_weights, best_offsets, max_acc, num_iters
+            
+        accuracies.append(acc)
         if num_iters%1000==0:
-            print 'Iters, acc', num_iters, acc, test_acc
+            print 'Iters, acc', num_iters, acc
 
     
     
@@ -301,7 +322,7 @@ def classify_accuracy(X, Y, weights, offsets):
             assert False
     acc = correct/n1
     if np.isnan(acc):
-        print 'eh'
+        return 0
     return acc
 
 def one_hot(Y,k):
@@ -315,22 +336,70 @@ def one_hot(Y,k):
     return one_hot
     
 #### TEST ON TOY DATASET ####
-test_toy = True
+test_toy = False
 if test_toy:
     toy_data = './hw3_resources/data/data_3class.csv'
     train = np.loadtxt(toy_data)
     X = train[:,0:2]
     Y = train[:,2:3].astype(int)
-    Xtrain = X[:600,:]
-    Ytrain = one_hot(Y[:600,:].reshape(1,-1)[0],3)
+    Xtrain = X[:400,:]
+    Ytrain = one_hot(Y[:400,:].reshape(1,-1)[0],3)
 
-    Xval = X[600:,:]
-    Yval = one_hot(Y[600:,:].reshape(1,-1)[0],3)
+    Xval = X[400:600,:]
+    Yval = one_hot(Y[400:600,:].reshape(1,-1)[0],3)
     
     Xtest = X[600:,:]
     Ytest = one_hot(Y[600:,:].reshape(1,-1)[0],3)
-    print Y[400:410,:], one_hot(Y[400:410,:].reshape(1,-1)[0],3)
     print 'Training...'
-    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=4,M=[5,10,3])
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=4,M=[5,10,3])   
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
     print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
+    
+    def predictNN(x):
+        y_vector = NN_predict(x, weights, offsets)
+        index = np.nonzero(y_vector)
+        return index[0][0]
+    # plot validation results
+    plot.plotDecisionBoundary(X, Y, predictNN, [-1,0,1], title = 'NN toy set')
+    pl.show()
+    
+#### TEST ON HW2 DATA SETS ####
+hw2_data = True
+if hw2_data:
+    # parameters
+    name = '2'
+    print '======Training======'
+    # load data from csv files
+    train = np.loadtxt('data/data'+name+'_train.csv')
+    Xtrain = train[:, 0:2]
+    Ytrain_values=train[:, 2:3].astype(int)
+    Ytrain_values[Ytrain_values < 0] = 0
+    Ytrain = one_hot(Ytrain_values.reshape(1,-1)[0],2)
+    val = np.loadtxt('data/data'+name+'_validate.csv')
+    Xval = val[:, 0:2]
+    Yval_values = val[:, 2:3].astype(int)
+    Yval_values[Yval_values < 0] = 0
+    Yval = one_hot(Yval_values.reshape(1,-1)[0],2)
+    test = np.loadtxt('data/data'+name+'_test.csv')
+    Xtest = test[:, 0:2]
+    Ytest_values = test[:, 2:3].astype(int)
+    Ytest_values[Ytest_values < 0] = 0
+    Ytest = one_hot(Ytest_values.reshape(1,-1)[0],2)
+    
+    print Ytrain_values[:10,:]
+    print Ytrain[:10,:]   
+    print 'Training...'
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M=[10,2], k=2)   
+    print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
+    print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
+    print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
+    def predictNN(x):
+        aggregated, activated = forward_prop(x, weights, offsets)
+        y = activated[-1]
+        # calculate the expected value to predict for smooth plotting
+        return y[1] - y[0]
+
+    # plot validation results
+    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [-1,0,1], title = 'Data set '+name+' using one small hidden layer')
+    pl.show()
+

@@ -15,15 +15,16 @@ def plotDecisionBoundary(X, Y, scoreFn, values, title = ""):
     h = max((x_max-x_min)/200., (y_max-y_min)/200.)
     xx, yy = meshgrid(arange(x_min, x_max, h),
                       arange(y_min, y_max, h))
+    print xx.shape, yy.shape                  
 
-    zz = array([scoreFn(x) for x in c_[xx.ravel(), yy.ravel()]])
+    zz = array([scoreFn(x) for x in c_[xx.ravel(), yy.ravel()]])  
     zz = zz.reshape(xx.shape)
     pl.figure()
     pl.subplot('111', axisbg='whitesmoke')
-    CS = pl.contour(xx, yy, zz, values, colors = 'green', linestyles = 'solid', linewidths = 2)
-    pl.clabel(CS, fontsize=12, inline=1)
+    CS = pl.contour(xx, yy, zz, values, colors = 'black', linestyles = 'solid', linewidths = 2)
+    #pl.clabel(CS, fontsize=10, inline=1)
     # Plot the training points
     pl.scatter(X[:, 0], X[:, 1], c=(1.-Y), s=50, cmap = pl.cm.Spectral)
-    
-    pl.title(title, fontsize=16)
+    pl.title(title, fontsize=30)
     pl.axis('tight')
+    pl.axis(fontsize=20)
