@@ -243,7 +243,7 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, initial_rate = 0.00
     best_offsets = np.copy(offsets)
     # Train the neural network until its performance on a validation set plateaus
 
-    history =10000 # number of previous accuracies to consider
+    history =5000 # number of previous accuracies to consider
     accuracies = [0]*history
     max_acc = 0
     num_iters = 0
@@ -391,7 +391,7 @@ if hw2_data:
     print Ytrain_values[:10,:]
     print Ytrain[:10,:]   
     print 'Training...'
-    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M=[10,2], k=2)   
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, initial_rate=0.1, L=3, M=[50000,2], k=2)   
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
     print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
     print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
@@ -402,23 +402,23 @@ if hw2_data:
         return y[1] - y[0]
 
     # plot validation results
-    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [-1,0,1], title = 'Data set '+name+' using one small hidden layer')
+    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [0], title = 'Data Set '+name+' using 2 hidden layer with 50000 neurons')
     pl.show()
-    
 #### TEST ON MNIST DATASETS ####
 mnist = 1
 normalize = True
 if mnist:
     digits = [0,1,2,3,4,5,6,7,8,9]
-    train = 100
+    train = 200
     val = 50
-    test = 5
+    test = 500
     Xtrain = np.ndarray((0,784))
     Xval = np.ndarray((0,784))
     Xtest = np.ndarray((0,784))
     Ytrain = np.ndarray((0,10))
     Yval = np.ndarray((0,10))
     Ytest = np.ndarray((0,10))
+    Ytest_values = np.ndarray((0,1))
     print '====== MNIST DATA SET ======'
     for digit in digits:    
         data = np.loadtxt('data/mnist_digit_'+str(digit)+'.csv')
@@ -435,16 +435,30 @@ if mnist:
         
         Xtest = np.vstack((Xtest,X[train+val:train+val+test,:]))
         Ytest = np.vstack((Ytest,one_hot(Y[train+val:train+val+test].reshape(1,-1)[0],10)))
+        print Ytest_values.shape, Y[train+val:train+val+test].reshape(-1,1).shape
+        Ytest_values = np.vstack((Ytest_values,Y[train+val:train+val+test].reshape(-1,1)))
     print 'Loaded data'
     print Ytest.shape, Xtest.shape
     print Ytest[:10], Xtest[:10]
 
     print 'Training...'
-    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=3, initial_rate=0.005, fixed=True, M=[10,2], k=10)   
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=4, initial_rate=0.005, fixed=True, M=[128,32,2], k=10)   
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
     print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
     print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
 
+    def predictNN(x):
+        aggregated, activated = forward_prop(x, weights, offsets)
+        y = activated[-1]
+        # calculate the expected value to predict for smooth plotting
+        expected = sum([i*y[i] for i in range(10)])
+        expected -= 5
+        expected *= 0.2
+        return expected
+
+    # plot validation results
+    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [0], title = 'MNIST Dataset Using 128, 32 Neurons')
+    pl.show()
 
 #    Ytrain = one_hot(Ytrain_values.reshape(1,-1)[0],10)
 #    print Ytrain_values[:10,:]

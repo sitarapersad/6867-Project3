@@ -25,6 +25,6 @@ def plotDecisionBoundary(X, Y, scoreFn, values, title = ""):
     #pl.clabel(CS, fontsize=10, inline=1)
     # Plot the training points
     pl.scatter(X[:, 0], X[:, 1], c=(1.-Y), s=50, cmap = pl.cm.Spectral)
-    pl.title(title, fontsize=30)
+    pl.title(title, fontsize=25)
     pl.axis('tight')
     pl.axis(fontsize=20)
