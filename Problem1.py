@@ -243,7 +243,7 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, initial_rate = 0.00
     best_offsets = np.copy(offsets)
     # Train the neural network until its performance on a validation set plateaus
 
-    history =5000 # number of previous accuracies to consider
+    history =9000 # number of previous accuracies to consider
     accuracies = [0]*history
     max_acc = 0
     num_iters = 0
@@ -391,7 +391,7 @@ if hw2_data:
     print Ytrain_values[:10,:]
     print Ytrain[:10,:]   
     print 'Training...'
-    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, initial_rate=0.1, L=3, M=[5,2], k=2)   
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, initial_rate=0.1, L=3, M=[1000,2], k=2)   
     print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
     print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
     print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
@@ -403,15 +403,16 @@ if hw2_data:
 
     # plot validation results
     print Xtest.shape, Ytest_values.shape, 'bye'
-    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [0], title = 'Data Set '+name+' using 1 hidden layer with 5 neurons')
+    plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [0], title = 'Data Set '+name+' using 1 hidden layer with 1000 neurons')
     pl.show()
+    
 #### TEST ON MNIST DATASETS ####
 mnist = 1
 normalize = True
 if mnist:
     digits = [0,1,2,3,4,5,6,7,8,9]
-    train = 20
-    val = 5
+    train = 200
+    val = 20
     test = 50
     Xtrain = np.ndarray((0,784))
     Xval = np.ndarray((0,784))
@@ -424,7 +425,6 @@ if mnist:
     print '====== MNIST DATA SET ======'
     for digit in digits:    
         data = np.loadtxt('data/mnist_digit_'+str(digit)+'.csv')
-
         X = data[:train+val+test, :]
         Y = np.array([digit]*(train+val+test))
         # normalize data
@@ -450,26 +450,30 @@ if mnist:
     print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
     print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
 
-    from matplotlib import pyplot as plt
+    import scipy.misc  as smp
+    import matplotlib.pyplot as plt
     
     def visualise_bad_images(Xtest,Ytest):
         #Check dimensions for sanity
         n1, d = Xtest.shape
         n2, k = Ytest.shape
         assert n1==n2
-        correct = 0.0
         for i in range(len(X)):
             predict_y = NN_predict(X[i], weights, offsets).reshape(1,-1)
             y = Ytest[i].reshape(1,-1)
             if np.dot(y, predict_y.T)[0][0] < 1:
                 x = Xtest[i].reshape(28,28) + 1
                 x *= 0.5
-                print x
-                imgplot = plt.imshow(x)
+                print y, predict_y
+                imgplot = smp.toimage(x)
                 imgplot.show()
+                try:
+                    person = input('Next? ')
+                except:
+                    pass
     visualise_bad_images(Xtest,Ytest)
             
-
+    print 'Done'
 
 #    Ytrain = one_hot(Ytrain_values.reshape(1,-1)[0],10)
 #    print Ytrain_values[:10,:]
