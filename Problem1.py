@@ -195,7 +195,7 @@ def back_prop(ytrain, weights, offsets, aggregated, activated, output_fn = softm
     return d
    
     
-def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 0.005, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
+def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, initial_rate = 0.005, fixed=False, activation_fn=ReLU, output_fn=softmax, loss_fn = cross_entropy):
     '''
     Trains a neural network given training data Xtrain and Y train
     using the following parameters:
@@ -243,13 +243,15 @@ def NN_train(Xtrain, Ytrain, Xval, Yval, L=3, M = None, k=3, learning_rate = 0.0
     best_offsets = np.copy(offsets)
     # Train the neural network until its performance on a validation set plateaus
 
-    history =500 # number of previous accuracies to consider
+    history =10000 # number of previous accuracies to consider
     accuracies = [0]*history
     max_acc = 0
     num_iters = 0
+    learning_rate = initial_rate
     while True:
         num_iters += 1
-        learning_rate = 0.2/np.power(num_iters, 1./3)
+        if not fixed:
+            learning_rate = initial_rate/np.power(num_iters, 1./3)
         # Choose random index for stochastic gradient update
         index = np.random.randint(0,n)
         xtrain = Xtrain[index].reshape(-1,1)
@@ -364,11 +366,11 @@ if test_toy:
     pl.show()
     
 #### TEST ON HW2 DATA SETS ####
-hw2_data = True
+hw2_data = 0
 if hw2_data:
     # parameters
-    name = '2'
-    print '======Training======'
+    name = '4'
+    print '====== HW2 DATA SET ======'
     # load data from csv files
     train = np.loadtxt('data/data'+name+'_train.csv')
     Xtrain = train[:, 0:2]
@@ -402,4 +404,49 @@ if hw2_data:
     # plot validation results
     plot.plotDecisionBoundary(Xtest, Ytest_values, predictNN, [-1,0,1], title = 'Data set '+name+' using one small hidden layer')
     pl.show()
+    
+#### TEST ON MNIST DATASETS ####
+mnist = 1
+normalize = True
+if mnist:
+    digits = [0,1,2,3,4,5,6,7,8,9]
+    train = 100
+    val = 50
+    test = 5
+    Xtrain = np.ndarray((0,784))
+    Xval = np.ndarray((0,784))
+    Xtest = np.ndarray((0,784))
+    Ytrain = np.ndarray((0,10))
+    Yval = np.ndarray((0,10))
+    Ytest = np.ndarray((0,10))
+    print '====== MNIST DATA SET ======'
+    for digit in digits:    
+        data = np.loadtxt('data/mnist_digit_'+str(digit)+'.csv')
 
+        X = data[:train+val+test, :]
+        Y = np.array([digit]*(train+val+test))
+        # normalize data
+        if normalize:
+            X = 2*X/255 - 1
+        Xtrain = np.vstack((Xtrain,X[:train,:]))
+        Ytrain = np.vstack((Ytrain,one_hot(Y[:train].reshape(1,-1)[0],10)))
+        Xval = np.vstack((Xval, X[train:train+val,:]))
+        Yval = np.vstack((Yval,one_hot(Y[train:train+val].reshape(1,-1)[0],10)))
+        
+        Xtest = np.vstack((Xtest,X[train+val:train+val+test,:]))
+        Ytest = np.vstack((Ytest,one_hot(Y[train+val:train+val+test].reshape(1,-1)[0],10)))
+    print 'Loaded data'
+    print Ytest.shape, Xtest.shape
+    print Ytest[:10], Xtest[:10]
+
+    print 'Training...'
+    weights, offsets , acc, num_iters = NN_train(Xtrain, Ytrain, Xval, Yval, L=3, initial_rate=0.005, fixed=True, M=[10,2], k=10)   
+    print 'Finished training in ', num_iters, ' rounds with a validation accuracy of ', acc
+    print 'Performance on test set: ', classify_accuracy(Xtest, Ytest, weights, offsets)
+    print 'Performance on training set: ', classify_accuracy(Xtrain, Ytrain, weights, offsets)
+
+
+#    Ytrain = one_hot(Ytrain_values.reshape(1,-1)[0],10)
+#    print Ytrain_values[:10,:]
+#    print Ytrain[:10,:]
+#    
